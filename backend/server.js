@@ -65,13 +65,14 @@ app.get('/api/health', (req, res) => {
 // Serve static files from frontend build (production only)
 if (process.env.NODE_ENV === 'production') {
   const frontendPath = path.join(__dirname, '../frontend/dist');
+  
+  // Serve static files
   app.use(express.static(frontendPath));
 
   // Serve index.html for all non-API routes (SPA support)
+  // This MUST be after all API routes
   app.get('*', (req, res) => {
-    if (!req.path.startsWith('/api')) {
-      res.sendFile(path.join(frontendPath, 'index.html'));
-    }
+    res.sendFile(path.join(frontendPath, 'index.html'));
   });
 }
 
