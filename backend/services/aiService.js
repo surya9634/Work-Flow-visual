@@ -1,10 +1,20 @@
-import OpenAI from 'openai';
+import Groq from 'groq-sdk';
 import User from '../models/User.js';
 import Campaign from '../models/Campaign.js';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
-});
+// Initialize Groq only if API key is available
+let groq = null;
+if (process.env.GROQ_API_KEY) {
+  groq = new Groq({
+    apiKey: process.env.GROQ_API_KEY,
+    defaultHeaders: {
+      "Groq-Model-Version": "latest"
+    }
+  });
+  console.log('✅ Groq AI initialized');
+} else {
+  console.log('⚠️  Groq API key not found - using fallback responses');
+}
 
 /**
  * Train Global AI with business information
@@ -86,44 +96,81 @@ export const updateGlobalAIWithCampaign = async (userId, campaign) => {
 };
 
 /**
- * Generate AI response for customer message
+ * Generate AI response for customer message with Groq (Web Search + Advanced Tools)
  */
-export const generateAIResponse = async (customerMessage, campaign, conversationHistory = []) => {
+export const generateAIResponse = async (customerMessage, campaign, conversationHistory = [], user = null) => {
   try {
-    if (!process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY === 'your_openai_api_key_here') {
-      // Fallback response when OpenAI is not configured
+    if (!process.env.GROQ_API_KEY) {
       return generateFallbackResponse(customerMessage, campaign);
     }
 
-    const systemPrompt = `You are a sales AI assistant for ${campaign.product.name}. 
-Your goal is to help customers and guide them towards making a purchase.
+    // Get user's knowledge base for context
+    let businessContext = '';
+    if (user) {
+      const userData = await User.findById(user._id || user);
+      if (userData?.globalAI?.knowledgeBase) {
+        const kb = JSON.parse(userData.globalAI.knowledgeBase);
+        businessContext = `\n\nBusiness Context:\n- Company: ${kb.business?.name}\n- Industry: ${kb.business?.industry}\n- Description: ${kb.business?.description}`;
+      }
+    }
 
-Product Information:
+    const systemPrompt = `You are an advanced AI sales assistant for ${campaign.product.name}. You have access to web search, code interpreter, and website visiting tools to provide the most accurate and helpful responses.
+
+🎯 YOUR MISSION:
+Help customers make informed purchase decisions by providing accurate, helpful, and persuasive information.
+
+📦 PRODUCT INFORMATION:
 - Name: ${campaign.product.name}
 - Description: ${campaign.product.description}
 - Price: $${campaign.product.price}
-- Features: ${campaign.product.features?.join(', ')}
+- Features: ${campaign.product.features?.join(', ') || 'Premium quality product'}
+${businessContext}
 
-Chat Flow:
-- Greeting: ${campaign.chatFlow?.greeting}
-- Closing: ${campaign.chatFlow?.closingMessage}
+💬 CHAT FLOW GUIDELINES:
+- Greeting: ${campaign.chatFlow?.greeting || 'Hello! How can I help you today?'}
+- Closing: ${campaign.chatFlow?.closingMessage || 'Thank you for your interest!'}
 
-Be friendly, helpful, and professional. Answer questions about the product and guide customers through the buying process.`;
+🔧 YOUR CAPABILITIES:
+1. **Web Search**: Use this to find latest information, reviews, comparisons, or market data
+2. **Code Interpreter**: Use this to calculate pricing, discounts, ROI, or analyze data
+3. **Visit Website**: Use this to get real-time information from specific URLs
+
+📋 RESPONSE STRATEGY:
+1. Understand customer intent (browsing, comparing, ready to buy)
+2. Use web search if customer asks about comparisons, reviews, or market trends
+3. Provide specific, data-backed answers
+4. Guide towards purchase naturally
+5. Handle objections professionally
+6. Always be helpful, friendly, and professional
+
+🎯 LEAD QUALIFICATION:
+- Ask qualifying questions naturally
+- Understand budget, timeline, and needs
+- Score leads based on buying signals
+
+Remember: You're not just answering questions - you're building trust and guiding customers to make the best decision!`;
 
     const messages = [
       { role: 'system', content: systemPrompt },
-      ...conversationHistory.map(msg => ({
+      ...conversationHistory.slice(-10).map(msg => ({
         role: msg.sender === 'customer' ? 'user' : 'assistant',
         content: msg.content
       })),
       { role: 'user', content: customerMessage }
     ];
 
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-3.5-turbo',
+    const completion = await groq.chat.completions.create({
+      model: "groq/compound",
       messages,
-      temperature: 0.7,
-      max_tokens: 200
+      temperature: 0.8,
+      max_completion_tokens: 1024,
+      top_p: 0.95,
+      stream: false,
+      compound_custom: {
+        tools: {
+          enabled_tools: ["web_search", "code_interpreter", "visit_website"]
+        }
+      }
     });
 
     return completion.choices[0].message.content;
@@ -159,44 +206,95 @@ const generateFallbackResponse = (customerMessage, campaign) => {
 };
 
 /**
- * Get Leo AI response (business assistant)
+ * Get Leo AI response (business assistant) with Groq Advanced Tools
  */
 export const getLeoAIResponse = async (message, conversationHistory, user, campaigns) => {
   try {
-    if (!process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY === 'your_openai_api_key_here') {
+    if (!process.env.GROQ_API_KEY) {
       return getLeoFallbackResponse(message, user, campaigns);
     }
 
-    const systemPrompt = `You are Leo, an AI assistant helping ${user.businessInfo?.businessName || 'the business'} manage their sales automation platform.
+    // Get full business context
+    let knowledgeBase = {};
+    if (user.globalAI?.knowledgeBase) {
+      try {
+        knowledgeBase = JSON.parse(user.globalAI.knowledgeBase);
+      } catch (e) {
+        console.error('Parse knowledge base error:', e);
+      }
+    }
 
-Business Information:
-- Business Name: ${user.businessInfo?.businessName}
-- Industry: ${user.businessInfo?.industry}
-- Description: ${user.businessInfo?.description}
+    const systemPrompt = `You are Leo, an advanced AI business assistant for ${user.businessInfo?.businessName || 'the business'}. You have access to web search, code interpreter, and website visiting tools to provide comprehensive business insights.
 
-Active Campaigns: ${campaigns.length}
-${campaigns.map(c => `- ${c.name}: ${c.product.name} (${c.status})`).join('\n')}
+🏢 BUSINESS PROFILE:
+- Name: ${user.businessInfo?.businessName || 'Not set'}
+- Owner: ${user.businessInfo?.ownerName || 'Not set'}
+- Industry: ${user.businessInfo?.industry || 'Not set'}
+- Description: ${user.businessInfo?.description || 'Not set'}
+- Website: ${user.businessInfo?.website || 'Not set'}
+- Phone: ${user.businessInfo?.phone || 'Not set'}
 
-You help with:
-- Understanding analytics and performance
-- Managing campaigns
-- Optimizing sales strategies
-- Answering questions about the platform
-- Providing insights and recommendations
+📊 CURRENT CAMPAIGNS (${campaigns.length} total):
+${campaigns.map(c => `
+• ${c.name} (${c.status})
+  - Product: ${c.product.name}
+  - Price: $${c.product.price}
+  - Platform: ${c.targetPlatform}
+  - Stats: ${c.stats?.messagesSet || 0} messages, ${c.stats?.conversions || 0} conversions, $${c.stats?.revenue || 0} revenue
+`).join('\n')}
 
-Be helpful, concise, and actionable.`;
+🎯 YOUR ROLE & CAPABILITIES:
+You are a strategic business advisor with access to:
+1. **Web Search**: Research market trends, competitors, best practices, industry insights
+2. **Code Interpreter**: Analyze data, calculate metrics, forecast trends, compute ROI
+3. **Visit Website**: Check competitor sites, verify information, gather real-time data
+
+💡 WHAT YOU HELP WITH:
+- **Analytics & Performance**: Interpret metrics, identify trends, suggest improvements
+- **Campaign Strategy**: Optimize campaigns, suggest new products, improve messaging
+- **Sales Optimization**: Increase conversions, improve response rates, maximize revenue
+- **Market Research**: Competitor analysis, industry trends, customer insights
+- **Platform Guidance**: How to use features, best practices, troubleshooting
+- **Business Growth**: Scaling strategies, automation tips, efficiency improvements
+
+📋 RESPONSE GUIDELINES:
+1. **Be Proactive**: Don't just answer - provide insights and recommendations
+2. **Use Data**: Reference actual campaign stats and business metrics
+3. **Be Specific**: Give actionable advice with clear next steps
+4. **Use Tools**: 
+   - Web search for market research and trends
+   - Code interpreter for calculations and analysis
+   - Visit website for competitor research
+5. **Be Concise**: Clear, actionable responses (not too long)
+6. **Think Strategically**: Focus on business growth and ROI
+
+🔍 ANALYSIS CAPABILITIES:
+- Calculate conversion rates, ROI, customer lifetime value
+- Analyze campaign performance and suggest optimizations
+- Research competitors and market positioning
+- Forecast revenue and growth trends
+- Identify bottlenecks and opportunities
+
+Remember: You're not just a chatbot - you're a strategic business partner helping grow ${user.businessInfo?.businessName || 'this business'}!`;
 
     const messages = [
       { role: 'system', content: systemPrompt },
-      ...conversationHistory,
+      ...conversationHistory.slice(-15),
       { role: 'user', content: message }
     ];
 
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-3.5-turbo',
+    const completion = await groq.chat.completions.create({
+      model: "groq/compound",
       messages,
       temperature: 0.7,
-      max_tokens: 300
+      max_completion_tokens: 1024,
+      top_p: 0.9,
+      stream: false,
+      compound_custom: {
+        tools: {
+          enabled_tools: ["web_search", "code_interpreter", "visit_website"]
+        }
+      }
     });
 
     return completion.choices[0].message.content;

@@ -118,11 +118,11 @@ const handleIncomingMessage = async (webhookEvent, user, io) => {
       message: customerMessage
     });
 
-    // Generate AI response
+    // Generate AI response with user context
     const campaign = await Campaign.findById(chat.campaignId);
     const conversationHistory = chat.messages.slice(-10); // Last 10 messages for context
 
-    const aiResponse = await generateAIResponse(messageText, campaign, conversationHistory);
+    const aiResponse = await generateAIResponse(messageText, campaign, conversationHistory, user._id);
 
     // Send AI response
     await sendMessage('facebook', senderId, aiResponse, user._id);
