@@ -54,7 +54,11 @@ NODE_ENV=production
 PORT=10000
 ```
 
-**Note:** Facebook Messenger credentials are NOT required. The app works fully without them. You can add Facebook integration later from the dashboard if needed.
+**Note about Facebook Messenger:**
+- **Optional but recommended** - If you add YOUR Facebook App credentials, users can connect THEIR Facebook pages
+- Without FB credentials: App works fully, but users can't connect Facebook Messenger
+- With FB credentials: Users can connect their Facebook pages via OAuth from the Integrations page
+- Get FB credentials from: https://developers.facebook.com
 
 ---
 
@@ -125,9 +129,28 @@ In your Render service, go to **Environment** tab and add:
 | `JWT_SECRET` | Any random 32+ character string | `my_super_secret_jwt_key_2024` |
 | `GROQ_API_KEY` | Your Groq API key | `gsk_abc123...` |
 
-**That's it! Only 3 variables needed.**
+**That's it! Only 3 variables needed to get started.**
 
-> **Note:** Facebook Messenger integration is optional. You can connect it later from the Integrations page in your dashboard if you want to automate Facebook messages.
+#### **Optional: Enable Facebook Messenger for Users**
+
+If you want to allow your users to connect their Facebook pages:
+
+1. Create a Facebook App at https://developers.facebook.com
+2. Add "Messenger" product to your app
+3. Get your App ID and App Secret
+4. Add these environment variables in Render:
+
+| Variable | Value | Where to Get |
+|----------|-------|--------------|
+| `FB_APP_ID` | Your Facebook App ID | Facebook App Dashboard |
+| `FB_APP_SECRET` | Your Facebook App Secret | Facebook App Settings |
+| `FB_WEBHOOK_VERIFY_TOKEN` | Any random string | Create your own (e.g., `my_webhook_token_2024`) |
+
+**How it works:**
+- You provide YOUR Facebook App credentials once
+- Users can then connect THEIR Facebook pages via OAuth
+- Each user connects their own page from the Integrations page
+- Messages from their customers are automated by your AI
 
 Click **"Save Changes"** - Service will redeploy automatically.
 
@@ -312,7 +335,10 @@ NODE_ENV=production
 PORT=10000
 ```
 
-**Facebook Messenger:** Not required! App works fully without it. Connect later from dashboard if needed.
+**Facebook Messenger (Optional):**
+- Add YOUR Facebook App credentials to enable OAuth for users
+- Users can then connect THEIR Facebook pages from the Integrations page
+- Each user's Facebook messages will be automated by AI
 
 ---
 
