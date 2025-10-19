@@ -40,22 +40,21 @@ cd backend && npm run start:prod
 
 ## 🔑 Environment Variables (Required)
 
-Only need to set these for the single service:
+Only need to set these **3 variables** for the single service:
 
 ```env
-NODE_ENV=production
-PORT=10000
 MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/sales-automation?retryWrites=true&w=majority
 JWT_SECRET=your_super_secret_jwt_key_here
 GROQ_API_KEY=gsk_your_groq_api_key_here
 ```
 
-**Optional (for Facebook Messenger):**
+**Auto-set by Render (don't need to add):**
 ```env
-FB_APP_ID=your_facebook_app_id
-FB_APP_SECRET=your_facebook_app_secret
-FB_WEBHOOK_VERIFY_TOKEN=your_custom_verify_token
+NODE_ENV=production
+PORT=10000
 ```
+
+**Note:** Facebook Messenger credentials are NOT required. The app works fully without them. You can add Facebook integration later from the dashboard if needed.
 
 ---
 
@@ -126,12 +125,9 @@ In your Render service, go to **Environment** tab and add:
 | `JWT_SECRET` | Any random 32+ character string | `my_super_secret_jwt_key_2024` |
 | `GROQ_API_KEY` | Your Groq API key | `gsk_abc123...` |
 
-**Optional:**
-| Variable | Value |
-|----------|-------|
-| `FB_APP_ID` | Your Facebook App ID |
-| `FB_APP_SECRET` | Your Facebook App Secret |
-| `FB_WEBHOOK_VERIFY_TOKEN` | Your custom token |
+**That's it! Only 3 variables needed.**
+
+> **Note:** Facebook Messenger integration is optional. You can connect it later from the Integrations page in your dashboard if you want to automate Facebook messages.
 
 Click **"Save Changes"** - Service will redeploy automatically.
 
@@ -303,7 +299,7 @@ Node.js Server (server-production.js)
 
 ## 📝 Environment Variables Summary
 
-**Minimum Required:**
+**Only 3 Required:**
 ```env
 MONGODB_URI=mongodb+srv://...
 GROQ_API_KEY=gsk_...
@@ -316,12 +312,7 @@ NODE_ENV=production
 PORT=10000
 ```
 
-**Optional:**
-```env
-FB_APP_ID=...
-FB_APP_SECRET=...
-FB_WEBHOOK_VERIFY_TOKEN=...
-```
+**Facebook Messenger:** Not required! App works fully without it. Connect later from dashboard if needed.
 
 ---
 

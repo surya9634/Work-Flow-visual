@@ -16,12 +16,6 @@ services:
         sync: false
       - key: JWT_SECRET
         generateValue: true
-      - key: FB_APP_ID
-        sync: false
-      - key: FB_APP_SECRET
-        sync: false
-      - key: FB_WEBHOOK_VERIFY_TOKEN
-        sync: false
       - key: GROQ_API_KEY
         sync: false
     healthCheckPath: /api/health
