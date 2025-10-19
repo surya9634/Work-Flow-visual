@@ -70,13 +70,19 @@ const frontendPath = path.join(__dirname, '../frontend/dist');
 if (existsSync(frontendPath)) {
   console.log(`🌐 Serving frontend from: ${frontendPath}`);
   
-  // Serve static files
-  app.use(express.static(frontendPath));
+  // Serve static files (but not for /api routes)
+  app.use((req, res, next) => {
+    if (req.path.startsWith('/api')) {
+      return next();
+    }
+    express.static(frontendPath)(req, res, next);
+  });
 
   // Serve index.html for all non-API routes (SPA support)
-  // This MUST be after all API routes
   app.get('*', (req, res) => {
-    res.sendFile(path.join(frontendPath, 'index.html'));
+    if (!req.path.startsWith('/api')) {
+      res.sendFile(path.join(frontendPath, 'index.html'));
+    }
   });
 } else {
   console.log(`⚠️  Frontend dist folder not found at: ${frontendPath}`);
