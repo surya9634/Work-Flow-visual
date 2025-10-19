@@ -5,6 +5,7 @@ import { createServer } from 'http';
 import { Server } from 'socket.io';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { existsSync } from 'fs';
 import connectDB from './config/database.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -62,9 +63,12 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'Server is running' });
 });
 
-// Serve static files from frontend build (production only)
-if (process.env.NODE_ENV === 'production') {
-  const frontendPath = path.join(__dirname, '../frontend/dist');
+// Serve static files from frontend build
+const frontendPath = path.join(__dirname, '../frontend/dist');
+
+// Check if dist folder exists and serve it
+if (existsSync(frontendPath)) {
+  console.log(`🌐 Serving frontend from: ${frontendPath}`);
   
   // Serve static files
   app.use(express.static(frontendPath));
@@ -74,6 +78,9 @@ if (process.env.NODE_ENV === 'production') {
   app.get('*', (req, res) => {
     res.sendFile(path.join(frontendPath, 'index.html'));
   });
+} else {
+  console.log(`⚠️  Frontend dist folder not found at: ${frontendPath}`);
+  console.log(`⚠️  Running in API-only mode`);
 }
 
 // Socket.IO connection handling
