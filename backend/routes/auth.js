@@ -12,10 +12,8 @@ const generateToken = (id) => {
   });
 };
 
-// @route   POST /api/auth/register
-// @desc    Register a new user
-// @access  Public
-router.post('/register', async (req, res) => {
+// Registration handler
+const registerHandler = async (req, res) => {
   try {
     const { email, password, businessName } = req.body;
 
@@ -44,7 +42,17 @@ router.post('/register', async (req, res) => {
     console.error('Register error:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
-});
+};
+
+// @route   POST /api/auth/register
+// @desc    Register a new user
+// @access  Public
+router.post('/register', registerHandler);
+
+// @route   POST /api/auth/signup (alias for register)
+// @desc    Register a new user
+// @access  Public
+router.post('/signup', registerHandler);
 
 // @route   POST /api/auth/login
 // @desc    Login user
