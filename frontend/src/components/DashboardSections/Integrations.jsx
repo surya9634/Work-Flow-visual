@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { Facebook, Instagram, MessageCircle, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import { integrationAPI } from '../../services/api';
 import toast from 'react-hot-toast';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 
 const Integrations = () => {
   const [integrations, setIntegrations] = useState({
@@ -15,10 +16,34 @@ const Integrations = () => {
     pageId: '',
     pageAccessToken: ''
   });
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchIntegrationStatus();
-  }, []);
+    
+    // Handle OAuth callback
+    const success = searchParams.get('success');
+    const error = searchParams.get('error');
+    
+    if (success === 'facebook_connected') {
+      toast.success('Facebook Messenger connected successfully!');
+      // Clean up URL
+      navigate('/dashboard/integrations', { replace: true });
+      // Refresh integration status
+      setTimeout(() => fetchIntegrationStatus(), 1000);
+    } else if (error) {
+      const errorMessages = {
+        'access_denied': 'Facebook access was denied',
+        'no_pages': 'No Facebook pages found. Please make sure you have a Facebook Page.',
+        'connection_failed': 'Failed to connect Facebook. Please try again.',
+        'auth_failed': 'Facebook authentication failed. Please try again.'
+      };
+      toast.error(errorMessages[error] || 'Failed to connect Facebook');
+      // Clean up URL
+      navigate('/dashboard/integrations', { replace: true });
+    }
+  }, [searchParams, navigate]);
 
   const fetchIntegrationStatus = async () => {
     try {

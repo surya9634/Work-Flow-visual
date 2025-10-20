@@ -264,48 +264,6 @@ router.post('/facebook/disconnect', protect, async (req, res) => {
   }
 });
 
-// @route   GET /api/integrations/facebook/auth-url
-// @desc    Get Facebook OAuth URL
-// @access  Private
-router.get('/facebook/auth-url', protect, (req, res) => {
-  const redirectUri = `${process.env.BACKEND_URL || 'http://localhost:5000'}/api/integrations/facebook/callback`;
-  const scope = 'pages_messaging,pages_manage_metadata,pages_read_engagement';
-  
-  const authUrl = `https://www.facebook.com/v18.0/dialog/oauth?client_id=${process.env.FB_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scope}&response_type=code`;
-  
-  res.json({ authUrl });
-});
-
-// @route   GET /api/integrations/facebook/callback
-// @desc    Facebook OAuth callback
-// @access  Public
-router.get('/facebook/callback', async (req, res) => {
-  try {
-    const { code } = req.query;
-
-    if (!code) {
-      return res.redirect(`${process.env.FRONTEND_URL}/integrations?error=no_code`);
-    }
-
-    // Exchange code for access token
-    const tokenResponse = await axios.get('https://graph.facebook.com/v18.0/oauth/access_token', {
-      params: {
-        client_id: process.env.FB_APP_ID,
-        client_secret: process.env.FB_APP_SECRET,
-        redirect_uri: `${process.env.BACKEND_URL || 'http://localhost:5000'}/api/integrations/facebook/callback`,
-        code
-      }
-    });
-
-    const accessToken = tokenResponse.data.access_token;
-
-    // Redirect to frontend with token
-    res.redirect(`${process.env.FRONTEND_URL}/integrations/facebook/complete?token=${accessToken}`);
-  } catch (error) {
-    console.error('Facebook callback error:', error);
-    res.redirect(`${process.env.FRONTEND_URL}/integrations?error=auth_failed`);
-  }
-});
 
 // @route   GET /api/integrations/:platform/status
 // @desc    Get integration status
