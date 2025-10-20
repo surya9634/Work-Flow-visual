@@ -54,10 +54,8 @@ router.post('/register', registerHandler);
 // @access  Public
 router.post('/signup', registerHandler);
 
-// @route   POST /api/auth/login
-// @desc    Login user
-// @access  Public
-router.post('/login', async (req, res) => {
+// Login handler
+const loginHandler = async (req, res) => {
   try {
     const { email, password } = req.body;
 
@@ -84,7 +82,17 @@ router.post('/login', async (req, res) => {
     console.error('Login error:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
-});
+};
+
+// @route   POST /api/auth/login
+// @desc    Login user
+// @access  Public
+router.post('/login', loginHandler);
+
+// @route   POST /api/auth/signin (alias for login)
+// @desc    Login user
+// @access  Public
+router.post('/signin', loginHandler);
 
 // @route   GET /api/auth/me
 // @desc    Get current user
