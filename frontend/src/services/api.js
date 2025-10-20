@@ -30,11 +30,19 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Clear all auth data
-      localStorage.removeItem('user');
-      localStorage.removeItem('token');
-      localStorage.removeItem('authToken');
-      window.location.href = '/';
+      console.error('401 Unauthorized - Token might be invalid');
+      console.error('Current token:', localStorage.getItem('token'));
+      console.error('Request URL:', error.config?.url);
+      console.error('Request headers:', error.config?.headers);
+      
+      // Only redirect if it's not the integrations endpoint (for debugging)
+      if (!error.config?.url?.includes('/integrations/facebook/auth')) {
+        // Clear all auth data
+        localStorage.removeItem('user');
+        localStorage.removeItem('token');
+        localStorage.removeItem('authToken');
+        window.location.href = '/';
+      }
     }
     return Promise.reject(error);
   }

@@ -43,6 +43,10 @@ const Integrations = () => {
   };
 
   const handleFacebookConnect = async () => {
+    console.log('Facebook connect clicked');
+    console.log('Token:', localStorage.getItem('token'));
+    console.log('User:', localStorage.getItem('user'));
+    
     setIntegrations(prev => ({
       ...prev,
       facebook: { ...prev.facebook, loading: true }
@@ -50,13 +54,18 @@ const Integrations = () => {
 
     try {
       // Get OAuth URL from backend
+      console.log('Calling getFacebookAuthUrl...');
       const response = await integrationAPI.getFacebookAuthUrl();
+      console.log('Auth URL response:', response.data);
       const { authUrl } = response.data;
       
       // Redirect to Facebook OAuth
+      console.log('Redirecting to:', authUrl);
       window.location.href = authUrl;
     } catch (error) {
       console.error('Facebook connect error:', error);
+      console.error('Error response:', error.response);
+      console.error('Error status:', error.response?.status);
       toast.error(error.response?.data?.message || 'Failed to initiate Facebook connection');
       setIntegrations(prev => ({
         ...prev,
