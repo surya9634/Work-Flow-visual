@@ -94,6 +94,11 @@ const Integrations = () => {
       console.log('Calling getFacebookAuthUrl...');
       const response = await integrationAPI.getFacebookAuthUrl();
       console.log('Auth URL response:', response.data);
+      
+      if (!response.data || !response.data.authUrl) {
+        throw new Error('No auth URL received from server');
+      }
+      
       const { authUrl } = response.data;
       
       // Redirect to Facebook OAuth
@@ -103,7 +108,20 @@ const Integrations = () => {
       console.error('Facebook connect error:', error);
       console.error('Error response:', error.response);
       console.error('Error status:', error.response?.status);
-      toast.error(error.response?.data?.message || 'Failed to initiate Facebook connection');
+      console.error('Error data:', error.response?.data);
+      
+      let errorMessage = 'Failed to initiate Facebook connection';
+      
+      if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+        
+        // Add helpful context for common errors
+        if (errorMessage.includes('not configured')) {
+          errorMessage += '. Please contact the administrator to set up Facebook App credentials.';
+        }
+      }
+      
+      toast.error(errorMessage);
       setIntegrations(prev => ({
         ...prev,
         facebook: { ...prev.facebook, loading: false }
