@@ -33,12 +33,15 @@ const registerHandler = async (req, res) => {
     });
 
     res.status(201).json({
-      _id: user._id,
-      email: user.email,
-      role: user.role || 'user',
-      businessInfo: user.businessInfo,
-      onboardingCompleted: user.onboardingCompleted,
-      token: generateToken(user._id)
+      success: true,
+      token: generateToken(user._id),
+      user: {
+        id: user._id,
+        email: user.email,
+        role: user.role || 'user',
+        businessInfo: user.businessInfo,
+        onboardingCompleted: user.onboardingCompleted
+      }
     });
   } catch (error) {
     console.error('Register error:', error);
@@ -74,12 +77,15 @@ const loginHandler = async (req, res) => {
     }
 
     res.json({
-      _id: user._id,
-      email: user.email,
-      role: user.role || 'user',
-      businessInfo: user.businessInfo,
-      onboardingCompleted: user.onboardingCompleted,
-      token: generateToken(user._id)
+      success: true,
+      token: generateToken(user._id),
+      user: {
+        id: user._id,
+        email: user.email,
+        role: user.role || 'user',
+        businessInfo: user.businessInfo,
+        onboardingCompleted: user.onboardingCompleted
+      }
     });
   } catch (error) {
     console.error('Login error:', error);
