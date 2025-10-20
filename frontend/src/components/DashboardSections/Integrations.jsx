@@ -43,25 +43,21 @@ const Integrations = () => {
   };
 
   const handleFacebookConnect = async () => {
-    if (!facebookCredentials.pageId || !facebookCredentials.pageAccessToken) {
-      toast.error('Please enter both Page ID and Access Token');
-      return;
-    }
-
     setIntegrations(prev => ({
       ...prev,
       facebook: { ...prev.facebook, loading: true }
     }));
 
     try {
-      await integrationAPI.connectFacebook(facebookCredentials);
-      toast.success('Facebook Messenger connected successfully!');
-      setShowFacebookModal(false);
-      fetchIntegrationStatus();
+      // Get OAuth URL from backend
+      const response = await integrationAPI.getFacebookAuthUrl();
+      const { authUrl } = response.data;
+      
+      // Redirect to Facebook OAuth
+      window.location.href = authUrl;
     } catch (error) {
       console.error('Facebook connect error:', error);
-      toast.error(error.response?.data?.message || 'Failed to connect Facebook');
-    } finally {
+      toast.error(error.response?.data?.message || 'Failed to initiate Facebook connection');
       setIntegrations(prev => ({
         ...prev,
         facebook: { ...prev.facebook, loading: false }
@@ -177,17 +173,17 @@ const Integrations = () => {
                   </button>
                 ) : (
                   <button
-                    onClick={() => platform.id === 'facebook' && setShowFacebookModal(true)}
+                    onClick={() => platform.id === 'facebook' && handleFacebookConnect()}
                     disabled={integrations[platform.id].loading}
                     className="w-full py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg font-semibold hover:from-purple-700 hover:to-blue-700 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
                   >
                     {integrations[platform.id].loading ? (
                       <>
                         <Loader2 className="w-4 h-4 animate-spin" />
-                        Connecting...
+                        Redirecting to Facebook...
                       </>
                     ) : (
-                      'Connect'
+                      'Connect with Facebook'
                     )}
                   </button>
                 )

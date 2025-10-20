@@ -72,7 +72,7 @@ export const integrationAPI = {
   getAll: () => api.get('/integrations'),
   connectFacebook: (data) => api.post('/integrations/facebook/connect', data),
   disconnectFacebook: () => api.post('/integrations/facebook/disconnect'),
-  getFacebookAuthUrl: () => api.get('/integrations/facebook/auth-url'),
+  getFacebookAuthUrl: () => api.get('/integrations/facebook/auth'),
   getStatus: (platform) => api.get(`/integrations/${platform}/status`),
 };
 
