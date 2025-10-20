@@ -21,10 +21,8 @@ const upload = multer({
   limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
 });
 
-// @route   POST /api/onboarding/complete
-// @desc    Complete onboarding process
-// @access  Private
-router.post('/complete', protect, async (req, res) => {
+// Onboarding handler
+const onboardingHandler = async (req, res) => {
   try {
     const {
       businessName,
@@ -62,10 +60,12 @@ router.post('/complete', protect, async (req, res) => {
     }
 
     res.json({
+      success: true,
       message: 'Onboarding completed successfully',
       user: {
-        _id: user._id,
+        id: user._id,
         email: user.email,
+        role: user.role || 'user',
         businessInfo: user.businessInfo,
         onboardingCompleted: user.onboardingCompleted
       }
@@ -74,7 +74,17 @@ router.post('/complete', protect, async (req, res) => {
     console.error('Onboarding error:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
-});
+};
+
+// @route   POST /api/onboarding
+// @desc    Complete onboarding process
+// @access  Private
+router.post('/', protect, onboardingHandler);
+
+// @route   POST /api/onboarding/complete (alias)
+// @desc    Complete onboarding process
+// @access  Private
+router.post('/complete', protect, onboardingHandler);
 
 // @route   POST /api/onboarding/upload-document
 // @desc    Upload business documents
