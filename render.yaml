@@ -1,11 +1,11 @@
 services:
-  # Full Stack Application (Backend + Frontend)
+  # Backend API Service
   - type: web
-    name: sales-automation-app
+    name: sales-automation-backend
     runtime: node
     region: oregon
     plan: free
-    buildCommand: cd frontend && npm install && npm run build && cd ../backend && npm install
+    buildCommand: cd backend && npm install
     startCommand: cd backend && npm start
     envVars:
       - key: NODE_ENV
@@ -16,6 +16,30 @@ services:
         sync: false
       - key: JWT_SECRET
         generateValue: true
+      - key: FRONTEND_URL
+        sync: false
       - key: GROQ_API_KEY
         sync: false
+      - key: FB_APP_ID
+        sync: false
+      - key: FB_APP_SECRET
+        sync: false
+      - key: FB_WEBHOOK_VERIFY_TOKEN
+        sync: false
     healthCheckPath: /api/health
+
+  # Frontend Static Site
+  - type: web
+    name: sales-automation-frontend
+    runtime: static
+    region: oregon
+    plan: free
+    buildCommand: cd frontend && npm install && npm run build
+    staticPublishPath: ./frontend/dist
+    envVars:
+      - key: VITE_API_URL
+        sync: false
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
