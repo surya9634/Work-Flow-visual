@@ -1,5 +1,6 @@
 import express from 'express';
 import axios from 'axios';
+import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
 import Integration from '../models/Integration.js';
 import { protect } from '../middleware/auth.js';
@@ -22,8 +23,13 @@ router.get('/facebook/auth', protect, (req, res) => {
       return res.status(500).json({ message: 'Facebook App ID not configured' });
     }
 
-    // Store user ID in state parameter for callback
-    const state = Buffer.from(JSON.stringify({ userId: req.user._id })).toString('base64');
+    // Store user ID and generate a temporary token in state parameter for callback
+    const tempToken = jwt.sign(
+      { userId: req.user._id, type: 'oauth_callback' },
+      process.env.JWT_SECRET,
+      { expiresIn: '10m' } // Token valid for 10 minutes
+    );
+    const state = Buffer.from(JSON.stringify({ userId: req.user._id, tempToken })).toString('base64');
 
     // Facebook OAuth URL with required permissions
     const authUrl = `https://www.facebook.com/v18.0/dialog/oauth?` +
@@ -50,8 +56,8 @@ router.get('/facebook/callback', async (req, res) => {
       return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/dashboard/integrations?error=access_denied`);
     }
 
-    // Decode state to get user ID
-    const { userId } = JSON.parse(Buffer.from(state, 'base64').toString());
+    // Decode state to get user ID and temp token
+    const { userId, tempToken } = JSON.parse(Buffer.from(state, 'base64').toString());
 
     // Exchange code for access token
     const tokenResponse = await axios.get('https://graph.facebook.com/v18.0/oauth/access_token', {
@@ -116,8 +122,8 @@ router.get('/facebook/callback', async (req, res) => {
       { upsert: true, new: true }
     );
 
-    // Redirect back to frontend with success
-    res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/dashboard/integrations?success=facebook_connected`);
+    // Redirect back to frontend with success and temp token for re-authentication
+    res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/dashboard/integrations?success=facebook_connected&token=${tempToken}`);
   } catch (error) {
     console.error('Facebook callback error:', error);
     res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/dashboard/integrations?error=connection_failed`);

@@ -20,11 +20,20 @@ const Integrations = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    fetchIntegrationStatus();
-    
     // Handle OAuth callback
     const success = searchParams.get('success');
     const error = searchParams.get('error');
+    const token = searchParams.get('token');
+    
+    // If we have a token from OAuth callback, store it (in case session was lost)
+    if (token) {
+      const existingToken = localStorage.getItem('token');
+      if (!existingToken) {
+        // Session was lost during OAuth, restore it with the temp token
+        localStorage.setItem('token', token);
+        console.log('Restored session token from OAuth callback');
+      }
+    }
     
     if (success === 'facebook_connected') {
       toast.success('Facebook Messenger connected successfully!');
@@ -43,6 +52,9 @@ const Integrations = () => {
       // Clean up URL
       navigate('/dashboard/integrations', { replace: true });
     }
+    
+    // Fetch integration status after handling callback
+    fetchIntegrationStatus();
   }, [searchParams, navigate]);
 
   const fetchIntegrationStatus = async () => {
