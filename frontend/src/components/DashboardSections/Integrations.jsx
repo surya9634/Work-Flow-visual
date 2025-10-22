@@ -23,7 +23,10 @@ const Integrations = () => {
     // Handle OAuth callback
     const success = searchParams.get('success');
     const error = searchParams.get('error');
+    const message = searchParams.get('message');
     const token = searchParams.get('token');
+    
+    console.log('OAuth callback check:', { success, error, message, token });
     
     // If we have a token from OAuth callback, store it (in case session was lost)
     if (token) {
@@ -31,24 +34,33 @@ const Integrations = () => {
       if (!existingToken) {
         // Session was lost during OAuth, restore it with the temp token
         localStorage.setItem('token', token);
-        console.log('Restored session token from OAuth callback');
+        console.log('✅ Restored session token from OAuth callback');
       }
     }
     
     if (success === 'facebook_connected') {
-      toast.success('Facebook Messenger connected successfully!');
+      toast.success('🎉 Facebook Messenger connected successfully!');
+      console.log('✅ Facebook connected successfully');
       // Clean up URL
       navigate('/dashboard/integrations', { replace: true });
       // Refresh integration status
       setTimeout(() => fetchIntegrationStatus(), 1000);
     } else if (error) {
       const errorMessages = {
-        'access_denied': 'Facebook access was denied',
-        'no_pages': 'No Facebook pages found. Please make sure you have a Facebook Page.',
+        'access_denied': 'Facebook access was denied. Please grant the required permissions.',
+        'no_pages': 'No Facebook pages found. Please create a Facebook Page first.',
         'connection_failed': 'Failed to connect Facebook. Please try again.',
-        'auth_failed': 'Facebook authentication failed. Please try again.'
+        'auth_failed': 'Facebook authentication failed. Please try again.',
+        'invalid_state': 'Invalid OAuth state. Please try connecting again.'
       };
-      toast.error(errorMessages[error] || 'Failed to connect Facebook');
+      
+      let errorMsg = errorMessages[error] || 'Failed to connect Facebook';
+      if (message) {
+        errorMsg += ` (${decodeURIComponent(message)})`;
+      }
+      
+      console.error('❌ Facebook connection error:', error, message);
+      toast.error(errorMsg, { duration: 5000 });
       // Clean up URL
       navigate('/dashboard/integrations', { replace: true });
     }
@@ -80,9 +92,15 @@ const Integrations = () => {
   };
 
   const handleFacebookConnect = async () => {
-    console.log('Facebook connect clicked');
-    console.log('Token:', localStorage.getItem('token'));
-    console.log('User:', localStorage.getItem('user'));
+    console.log('🔵 Facebook connect clicked');
+    console.log('🔵 Token:', localStorage.getItem('token') ? 'Present' : 'Missing');
+    console.log('🔵 User:', localStorage.getItem('user') ? 'Present' : 'Missing');
+    
+    const token = localStorage.getItem('token');
+    if (!token) {
+      toast.error('Please log in first');
+      return;
+    }
     
     setIntegrations(prev => ({
       ...prev,
@@ -91,9 +109,9 @@ const Integrations = () => {
 
     try {
       // Get OAuth URL from backend
-      console.log('Calling getFacebookAuthUrl...');
+      console.log('🔵 Calling getFacebookAuthUrl...');
       const response = await integrationAPI.getFacebookAuthUrl();
-      console.log('Auth URL response:', response.data);
+      console.log('✅ Auth URL response:', response.data);
       
       if (!response.data || !response.data.authUrl) {
         throw new Error('No auth URL received from server');
@@ -101,27 +119,44 @@ const Integrations = () => {
       
       const { authUrl } = response.data;
       
+      // Show loading toast
+      toast.loading('Redirecting to Facebook...', { duration: 2000 });
+      
       // Redirect to Facebook OAuth
-      console.log('Redirecting to:', authUrl);
-      window.location.href = authUrl;
+      console.log('🔵 Redirecting to Facebook OAuth...');
+      console.log('🔗 URL:', authUrl);
+      
+      setTimeout(() => {
+        window.location.href = authUrl;
+      }, 500);
+      
     } catch (error) {
-      console.error('Facebook connect error:', error);
-      console.error('Error response:', error.response);
-      console.error('Error status:', error.response?.status);
-      console.error('Error data:', error.response?.data);
+      console.error('❌ Facebook connect error:', error);
+      console.error('❌ Error response:', error.response);
+      console.error('❌ Error status:', error.response?.status);
+      console.error('❌ Error data:', error.response?.data);
       
       let errorMessage = 'Failed to initiate Facebook connection';
       
-      if (error.response?.data?.message) {
+      if (error.response?.status === 401) {
+        errorMessage = 'Session expired. Please log in again.';
+        // Optionally redirect to login
+        setTimeout(() => {
+          localStorage.clear();
+          window.location.href = '/login';
+        }, 2000);
+      } else if (error.response?.data?.message) {
         errorMessage = error.response.data.message;
         
         // Add helpful context for common errors
         if (errorMessage.includes('not configured')) {
-          errorMessage += '. Please contact the administrator to set up Facebook App credentials.';
+          errorMessage = '⚠️ Facebook App not configured. Please check your .env file and ensure FB_APP_ID and FB_APP_SECRET are set correctly (not placeholder values).';
         }
+      } else if (error.message) {
+        errorMessage = error.message;
       }
       
-      toast.error(errorMessage);
+      toast.error(errorMessage, { duration: 5000 });
       setIntegrations(prev => ({
         ...prev,
         facebook: { ...prev.facebook, loading: false }

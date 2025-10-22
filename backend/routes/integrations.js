@@ -19,8 +19,22 @@ const REDIRECT_URI = process.env.BACKEND_URL
 // @access  Private
 router.get('/facebook/auth', protect, (req, res) => {
   try {
-    if (!FB_APP_ID) {
-      return res.status(500).json({ message: 'Facebook App ID not configured' });
+    console.log('🔵 Facebook OAuth initiated by user:', req.user._id);
+    console.log('🔵 FB_APP_ID:', FB_APP_ID ? 'Set' : 'NOT SET');
+    console.log('🔵 REDIRECT_URI:', REDIRECT_URI);
+    
+    if (!FB_APP_ID || FB_APP_ID === 'your_facebook_app_id') {
+      console.error('❌ Facebook App ID not configured or using placeholder');
+      return res.status(500).json({ 
+        message: 'Facebook App ID not configured. Please contact administrator.' 
+      });
+    }
+
+    if (!FB_APP_SECRET || FB_APP_SECRET === 'your_facebook_app_secret') {
+      console.error('❌ Facebook App Secret not configured or using placeholder');
+      return res.status(500).json({ 
+        message: 'Facebook App Secret not configured. Please contact administrator.' 
+      });
     }
 
     // Store user ID and generate a temporary token in state parameter for callback
@@ -29,7 +43,7 @@ router.get('/facebook/auth', protect, (req, res) => {
       process.env.JWT_SECRET,
       { expiresIn: '10m' } // Token valid for 10 minutes
     );
-    const state = Buffer.from(JSON.stringify({ userId: req.user._id, tempToken })).toString('base64');
+    const state = Buffer.from(JSON.stringify({ userId: req.user._id.toString(), tempToken })).toString('base64');
 
     // Facebook OAuth URL with required permissions
     const authUrl = `https://www.facebook.com/v18.0/dialog/oauth?` +
@@ -38,9 +52,12 @@ router.get('/facebook/auth', protect, (req, res) => {
       `&state=${state}` +
       `&scope=pages_manage_metadata,pages_messaging,pages_read_engagement,pages_manage_posts`;
 
+    console.log('✅ OAuth URL generated successfully');
+    console.log('🔗 Redirect URI:', REDIRECT_URI);
+    
     res.json({ authUrl });
   } catch (error) {
-    console.error('Facebook auth initiation error:', error);
+    console.error('❌ Facebook auth initiation error:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
@@ -49,17 +66,44 @@ router.get('/facebook/auth', protect, (req, res) => {
 // @desc    Handle Facebook OAuth callback
 // @access  Public (Facebook redirects here)
 router.get('/facebook/callback', async (req, res) => {
+  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+  
   try {
-    const { code, state } = req.query;
+    console.log('🔵 Facebook OAuth callback received');
+    console.log('🔵 Query params:', req.query);
+    
+    const { code, state, error, error_description } = req.query;
+
+    // Handle OAuth errors from Facebook
+    if (error) {
+      console.error('❌ Facebook OAuth error:', error, error_description);
+      return res.redirect(`${frontendUrl}/dashboard/integrations?error=access_denied&message=${encodeURIComponent(error_description || error)}`);
+    }
 
     if (!code) {
-      return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/dashboard/integrations?error=access_denied`);
+      console.error('❌ No authorization code received');
+      return res.redirect(`${frontendUrl}/dashboard/integrations?error=access_denied`);
+    }
+
+    if (!state) {
+      console.error('❌ No state parameter received');
+      return res.redirect(`${frontendUrl}/dashboard/integrations?error=invalid_state`);
     }
 
     // Decode state to get user ID and temp token
-    const { userId, tempToken } = JSON.parse(Buffer.from(state, 'base64').toString());
+    let userId, tempToken;
+    try {
+      const decoded = JSON.parse(Buffer.from(state, 'base64').toString());
+      userId = decoded.userId;
+      tempToken = decoded.tempToken;
+      console.log('✅ State decoded, userId:', userId);
+    } catch (decodeError) {
+      console.error('❌ Failed to decode state:', decodeError);
+      return res.redirect(`${frontendUrl}/dashboard/integrations?error=invalid_state`);
+    }
 
     // Exchange code for access token
+    console.log('🔵 Exchanging code for access token...');
     const tokenResponse = await axios.get('https://graph.facebook.com/v18.0/oauth/access_token', {
       params: {
         client_id: FB_APP_ID,
@@ -70,8 +114,10 @@ router.get('/facebook/callback', async (req, res) => {
     });
 
     const accessToken = tokenResponse.data.access_token;
+    console.log('✅ Access token received');
 
     // Get user's pages
+    console.log('🔵 Fetching user pages...');
     const pagesResponse = await axios.get('https://graph.facebook.com/v18.0/me/accounts', {
       params: {
         access_token: accessToken,
@@ -80,27 +126,38 @@ router.get('/facebook/callback', async (req, res) => {
     });
 
     const pages = pagesResponse.data.data;
+    console.log(`✅ Found ${pages?.length || 0} pages`);
 
     if (!pages || pages.length === 0) {
-      return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/dashboard/integrations?error=no_pages`);
+      console.error('❌ No Facebook pages found');
+      return res.redirect(`${frontendUrl}/dashboard/integrations?error=no_pages`);
     }
 
     // Use the first page (or let user select later)
     const page = pages[0];
+    console.log('✅ Using page:', page.name, '(ID:', page.id, ')');
 
     // Subscribe page to webhooks
-    await axios.post(
-      `https://graph.facebook.com/v18.0/${page.id}/subscribed_apps`,
-      {
-        subscribed_fields: 'messages,messaging_postbacks,messaging_optins,message_deliveries,message_reads'
-      },
-      {
-        params: { access_token: page.access_token }
-      }
-    );
+    try {
+      console.log('🔵 Subscribing page to webhooks...');
+      await axios.post(
+        `https://graph.facebook.com/v18.0/${page.id}/subscribed_apps`,
+        {
+          subscribed_fields: 'messages,messaging_postbacks,messaging_optins,message_deliveries,message_reads'
+        },
+        {
+          params: { access_token: page.access_token }
+        }
+      );
+      console.log('✅ Webhook subscription successful');
+    } catch (webhookError) {
+      console.error('⚠️ Webhook subscription failed (non-critical):', webhookError.response?.data || webhookError.message);
+      // Continue anyway - webhook can be configured manually
+    }
 
     // Save integration to database
-    await Integration.findOneAndUpdate(
+    console.log('🔵 Saving integration to database...');
+    const integration = await Integration.findOneAndUpdate(
       { userId, platform: 'facebook' },
       {
         userId,
@@ -121,12 +178,32 @@ router.get('/facebook/callback', async (req, res) => {
       },
       { upsert: true, new: true }
     );
+    console.log('✅ Integration saved to database');
 
-    // Redirect back to frontend with success and temp token for re-authentication
-    res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/dashboard/integrations?success=facebook_connected&token=${tempToken}`);
+    // Also update User model for backward compatibility
+    try {
+      await User.findByIdAndUpdate(userId, {
+        'integrations.facebook': {
+          connected: true,
+          pageId: page.id,
+          pageAccessToken: page.access_token,
+          connectedAt: new Date()
+        }
+      });
+      console.log('✅ User model updated');
+    } catch (userUpdateError) {
+      console.error('⚠️ User model update failed (non-critical):', userUpdateError.message);
+    }
+
+    // Redirect back to frontend with success
+    const redirectUrl = `${frontendUrl}/dashboard/integrations?success=facebook_connected&token=${tempToken}`;
+    console.log('✅ Redirecting to:', redirectUrl);
+    res.redirect(redirectUrl);
+    
   } catch (error) {
-    console.error('Facebook callback error:', error);
-    res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/dashboard/integrations?error=connection_failed`);
+    console.error('❌ Facebook callback error:', error.response?.data || error.message);
+    console.error('Error stack:', error.stack);
+    res.redirect(`${frontendUrl}/dashboard/integrations?error=connection_failed&message=${encodeURIComponent(error.message)}`);
   }
 });
 
